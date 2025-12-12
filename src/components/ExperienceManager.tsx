@@ -39,7 +39,6 @@ const ExperienceManager: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [apiMode, setApiMode] = useState<'local' | 'supabase'>('local');
   const [formData, setFormData] = useState<ExperienceFormData>({
     company: '',
     position: '',
@@ -52,164 +51,41 @@ const ExperienceManager: React.FC = () => {
     end_date: '',
   });
 
-  console.log('[ExperienceManager] Component mounted with API mode:', apiMode);
+  console.log('[ExperienceManager] Component mounted, loading from Supabase');
 
   useEffect(() => {
-    console.log('[ExperienceManager] useEffect triggered, loading experiences');
     loadExperiences();
-  }, [apiMode]);
-
-  const loadExperiencesLocal = async () => {
-    console.log('[ExperienceManager] Loading experiences via local storage');
-    try {
-      const stored = localStorage.getItem('experiences');
-      if (stored) {
-        const data = JSON.parse(stored);
-        setExperiences(Array.isArray(data) ? data : []);
-      } else {
-        setExperiences([]);
-      }
-    } catch (error) {
-      console.error('[ExperienceManager] Error loading from localStorage:', error);
-      setExperiences([]);
-    }
-  };
-
-  const loadExperiencesSupabase = async () => {
-    console.log('[ExperienceManager] Loading experiences via Supabase direct client');
-    try {
-      const { data, error } = await supabase
-        .from('experiences')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
-      }
-
-      console.log('[ExperienceManager] Successfully loaded from Supabase:', data);
-      setExperiences(data || []);
-    } catch (error) {
-      console.error('[ExperienceManager] Supabase error:', error);
-      throw error;
-    }
-  };
+  }, []);
 
   const loadExperiences = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log('[ExperienceManager] Loading experiences with mode:', apiMode);
+      console.log('[ExperienceManager] Loading experiences from Supabase...');
       
-      if (apiMode === 'local') {
-        await loadExperiencesLocal();
-      } else {
-        await loadExperiencesSupabase();
+      const { data, error } = await supabase
+        .from('experiences')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[ExperienceManager] Supabase error:', error);
+        throw error;
       }
+
+      console.log('[ExperienceManager] Successfully loaded from Supabase:', data);
+      setExperiences(data || []);
     } catch (error) {
       console.error('[ExperienceManager] Error loading experiences:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load experiences';
       setError(errorMessage);
-      
-      // Fallback to local storage if Supabase fails
-      if (apiMode === 'supabase') {
-        console.log('[ExperienceManager] Supabase failed, falling back to local storage');
-        try {
-          await loadExperiencesLocal();
-          setError('Using local storage (Supabase unavailable)');
-        } catch (localError) {
-          console.error('[ExperienceManager] Local storage also failed:', localError);
-        }
-      }
     } finally {
-      console.log('[ExperienceManager] Setting loading to false');
       setLoading(false);
     }
   };
 
-  const saveExperienceLocal = async (experienceData: any, isEdit: boolean) => {
-    console.log('[ExperienceManager] Saving to localStorage:', experienceData);
-    
-    const stored = localStorage.getItem('experiences');
-    let experiences = [];
-    
-    try {
-      experiences = stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      experiences = [];
-    }
-
-    if (isEdit && editingId) {
-      const index = experiences.findIndex((exp: any) => exp.id === editingId);
-      if (index >= 0) {
-        experiences[index] = { ...experienceData, id: editingId, created_at: experiences[index].created_at };
-      }
-    } else {
-      const newExperience = {
-        ...experienceData,
-        id: Date.now().toString(),
-        created_at: new Date().toISOString()
-      };
-      experiences.unshift(newExperience);
-    }
-
-    localStorage.setItem('experiences', JSON.stringify(experiences));
-    return { success: true };
-  };
-
-  const saveExperienceSupabase = async (experienceData: any, isEdit: boolean) => {
-    console.log('[ExperienceManager] Saving to Supabase:', experienceData);
-    
-    if (isEdit && editingId) {
-      const { error } = await supabase
-        .from('experiences')
-        .update(experienceData)
-        .eq('id', editingId);
-      
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('experiences')
-        .insert([experienceData]);
-      
-      if (error) throw error;
-    }
-
-    return { success: true };
-  };
-
-  const deleteExperienceLocal = async (id: string) => {
-    console.log('[ExperienceManager] Deleting from localStorage:', id);
-    
-    const stored = localStorage.getItem('experiences');
-    let experiences = [];
-    
-    try {
-      experiences = stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      experiences = [];
-    }
-
-    experiences = experiences.filter((exp: any) => exp.id !== id);
-    localStorage.setItem('experiences', JSON.stringify(experiences));
-    return { success: true };
-  };
-
-  const deleteExperienceSupabase = async (id: string) => {
-    console.log('[ExperienceManager] Deleting from Supabase:', id);
-    
-    const { error } = await supabase
-      .from('experiences')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
-    return { success: true };
-  };
-
   const resetForm = () => {
-    console.log('[ExperienceManager] Resetting form');
     setFormData({
       company: '',
       position: '',
@@ -244,37 +120,43 @@ const ExperienceManager: React.FC = () => {
         end_date: formData.is_current ? null : formData.end_date || null
       };
 
-      console.log('[ExperienceManager] Submitting experience data:', experienceData);
+      console.log('[ExperienceManager] Saving experience to Supabase:', experienceData);
       
-      let result;
-      if (apiMode === 'local') {
-        result = await saveExperienceLocal(experienceData, !!editingId);
+      if (editingId) {
+        // Update existing experience
+        const { error } = await supabase
+          .from('experiences')
+          .update(experienceData)
+          .eq('id', editingId);
+        
+        if (error) throw error;
+        console.log('[ExperienceManager] Experience updated successfully');
       } else {
-        result = await saveExperienceSupabase(experienceData, !!editingId);
+        // Insert new experience
+        const { error } = await supabase
+          .from('experiences')
+          .insert([experienceData]);
+        
+        if (error) throw error;
+        console.log('[ExperienceManager] Experience inserted successfully');
       }
       
-      if (result.success) {
-        console.log('[ExperienceManager] Experience saved successfully, reloading list');
-        await loadExperiences();
-        setShowModal(false);
-        resetForm();
-        alert(editingId ? 'Experience updated successfully!' : 'Experience added successfully!');
-      } else {
-        throw new Error('Failed to save experience');
-      }
+      // Reload experiences and close modal
+      await loadExperiences();
+      setShowModal(false);
+      resetForm();
+      alert(editingId ? 'Experience updated successfully!' : 'Experience added successfully!');
     } catch (error) {
-      console.error('[ExperienceManager] Error in handleSubmit:', error);
+      console.error('[ExperienceManager] Error saving experience:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to save experience';
       setError(errorMessage);
       alert(`Error: ${errorMessage}`);
     } finally {
-      console.log('[ExperienceManager] Setting submitting to false');
       setSubmitting(false);
     }
   };
 
   const handleEdit = (experience: Experience) => {
-    console.log('[ExperienceManager] Editing experience:', experience);
     setFormData({
       company: experience.company,
       position: experience.position,
@@ -297,20 +179,16 @@ const ExperienceManager: React.FC = () => {
       setError(null);
       console.log('[ExperienceManager] Deleting experience ID:', id);
       
-      let result;
-      if (apiMode === 'local') {
-        result = await deleteExperienceLocal(id);
-      } else {
-        result = await deleteExperienceSupabase(id);
-      }
+      const { error } = await supabase
+        .from('experiences')
+        .delete()
+        .eq('id', id);
       
-      if (result.success) {
-        console.log('[ExperienceManager] Experience deleted successfully, reloading list');
-        await loadExperiences();
-        alert('Experience deleted successfully!');
-      } else {
-        throw new Error('Failed to delete experience');
-      }
+      if (error) throw error;
+      
+      console.log('[ExperienceManager] Experience deleted successfully');
+      await loadExperiences();
+      alert('Experience deleted successfully!');
     } catch (error) {
       console.error('[ExperienceManager] Error deleting:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete experience';
@@ -320,30 +198,18 @@ const ExperienceManager: React.FC = () => {
   };
 
   const testConnection = async () => {
-    console.log('[ExperienceManager] Testing connection for mode:', apiMode);
+    console.log('[ExperienceManager] Testing Supabase connection...');
     try {
-      if (apiMode === 'local') {
-        const stored = localStorage.getItem('experiences');
-        alert('Local storage connection successful! Found ' + (stored ? JSON.parse(stored).length : 0) + ' experiences.');
-      } else {
-        const { count, error } = await supabase
-          .from('experiences')
-          .select('*', { count: 'exact', head: true });
-        
-        if (error) throw error;
-        alert(`Supabase connection successful! Found ${count || 0} experiences.`);
-      }
+      const { count, error } = await supabase
+        .from('experiences')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) throw error;
+      alert(`Supabase connection successful! Found ${count || 0} experiences in database.`);
     } catch (error) {
-      console.error('[ExperienceManager] Test connection error:', error);
+      console.error('[ExperienceManager] Connection test failed:', error);
       alert('Connection failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
-  };
-
-  const switchApiMode = () => {
-    const newMode = apiMode === 'local' ? 'supabase' : 'local';
-    console.log('[ExperienceManager] Switching API mode from', apiMode, 'to', newMode);
-    setApiMode(newMode);
-    setError(null);
   };
 
   if (loading) {
@@ -351,7 +217,7 @@ const ExperienceManager: React.FC = () => {
       <div className="p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-400"></div>
-          <span className="ml-3 text-gray-300">Loading experiences...</span>
+          <span className="ml-3 text-gray-300">Loading experiences from database...</span>
         </div>
       </div>
     );
@@ -363,20 +229,10 @@ const ExperienceManager: React.FC = () => {
         <h2 className="text-2xl font-bold text-white">Experience Management</h2>
         <div className="flex gap-2">
           <button
-            onClick={switchApiMode}
-            className={`px-3 py-1 rounded text-sm transition-colors ${
-              apiMode === 'local' 
-                ? 'bg-orange-500 text-white hover:bg-orange-600' 
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            }`}
-          >
-            {apiMode === 'local' ? 'Local Mode' : 'Supabase Mode'}
-          </button>
-          <button
             onClick={testConnection}
             className="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600 transition-colors"
           >
-            Test Connection
+            Test Supabase Connection
           </button>
           <button
             onClick={() => {
@@ -403,7 +259,7 @@ const ExperienceManager: React.FC = () => {
       )}
 
       <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-300 text-sm">
-        <strong>Status:</strong> Using {apiMode === 'local' ? 'Local Storage' : 'Supabase Direct Client'}
+        <strong>Status:</strong> Connected to Supabase Database
         <br />Experiences Count: {experiences.length}
         <br />Loading: {loading.toString()}
         <br />Submitting: {submitting.toString()}
@@ -411,7 +267,7 @@ const ExperienceManager: React.FC = () => {
 
       {experiences.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
-          No experience entries found. Add your first experience!
+          No experience entries found in database. Add your first experience!
         </div>
       ) : (
         <div className="grid gap-4">
@@ -587,7 +443,7 @@ const ExperienceManager: React.FC = () => {
                   disabled={submitting}
                   className="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Saving...' : (editingId ? 'Update' : 'Add')} Experience
+                  {submitting ? 'Saving to Database...' : (editingId ? 'Update' : 'Add')} Experience
                 </button>
                 <button
                   type="button"
