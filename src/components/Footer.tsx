@@ -12,7 +12,7 @@ const Footer: React.FC = () => {
 
           <div className="flex flex-col items-center md:items-end">
             <p className="text-gray-400 text-sm">
-              © {new Date().getFullYear()} All rights reserved.
+              Â© {new Date().getFullYear()} All rights reserved.
             </p>
             <p className="text-gray-500 text-xs mt-1">
               Built with React, TypeScript & Tailwind CSS
@@ -23,7 +23,7 @@ const Footer: React.FC = () => {
         <div className="mt-8 pt-8 border-t border-green-500/10 text-center">
           <p className="text-gray-500 text-sm">
             Designed & Developed with{' '}
-            <span className="text-green-400">❤</span> by a passionate developer
+            <span className="text-green-400">â¤</span> by a passionate developer
           </p>
         </div>
       </div>

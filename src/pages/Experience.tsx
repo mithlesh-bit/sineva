@@ -71,7 +71,7 @@ const Experience: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
         <div className="text-center p-8">
-          <div className="text-red-400 text-xl mb-4">⚠️ Error Loading Experiences</div>
+          <div className="text-red-400 text-xl mb-4">â ï¸ Error Loading Experiences</div>
           <p className="text-gray-300 mb-4">{error}</p>
           <button
             onClick={loadExperiences}
@@ -102,7 +102,7 @@ const Experience: React.FC = () => {
 
         {experiences.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-gray-400 text-xl mb-4">📝 No Experience Added Yet</div>
+            <div className="text-gray-400 text-xl mb-4">ð No Experience Added Yet</div>
             <p className="text-gray-500">Experience entries will appear here once added through the admin panel.</p>
           </div>
         ) : (
@@ -140,7 +140,7 @@ const Experience: React.FC = () => {
                         <h4 className="text-lg text-green-400 mb-2">{exp.company}</h4>
                         <div className="flex items-center gap-4 text-sm text-gray-400">
                           <span className="flex items-center gap-1">
-                            📅 {exp.duration}
+                            ð {exp.duration}
                           </span>
                           {exp.is_current && (
                             <span className="px-2 py-1 bg-green-500/20 border border-green-500/40 rounded-full text-green-400 text-xs font-medium">
